@@ -46,6 +46,11 @@ int long_set_insert(long_set *, unsigned long);
 // if inserted is not 0, write number of inserted elements
 int long_set_insert_set(long_set *num_set_1, long_set *num_set_2, size_t *inserted);
 
+#define LONG_SET_DELETE_NOITEM   0
+#define LONG_SET_DELETE_SUCCES   1
+
+int long_set_delete(long_set*, unsigned long);
+
 // returns -1, 0, 1 if set_1 < set_2; set_1 = set_2; set_1 > set_2
 int long_set_compare(long_set *set_1, long_set *set_2);
 

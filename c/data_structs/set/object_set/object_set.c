@@ -23,6 +23,7 @@ struct copy_context{
 };
 
 struct insert_context{
+    int result_code;
     compare_func *comparator;
     void *object;
     void **orig_object;
@@ -108,14 +109,16 @@ inline static void rot_right(struct object_rb_node **ptr){
     *ptr = x;
 }
 
-static int object_rb_insert(struct object_rb_node **ptr, struct insert_context *context, char sw){
-    int res;
+static void object_rb_insert(struct object_rb_node **ptr, struct insert_context *context, char sw){
     signed long cmp_res;
 
     if (*ptr == 0){
+        context -> result_code = OBJECT_SET_INSERT_SUCCES;
+
         if (!(*ptr = new_object_rb_node(context -> object, 1, 0, 0)))
-            return OBJECT_SET_INSERT_ERROR;
-        return OBJECT_SET_INSERT_SUCCES;
+            context -> result_code = OBJECT_SET_INSERT_ERROR;
+
+        return;
     }
 
     if (RED((*ptr) -> left) && RED((*ptr) -> right)){
@@ -127,8 +130,7 @@ static int object_rb_insert(struct object_rb_node **ptr, struct insert_context *
     cmp_res = context -> comparator(context -> object, (*ptr) -> object);
 
     if (cmp_res < 0){
-        if ((res = object_rb_insert(&((*ptr) -> left), context, 0)) != OBJECT_SET_INSERT_SUCCES)
-            return res;
+        object_rb_insert(&((*ptr) -> left), context, 0);
 
         if ((*ptr) -> is_red && RED((*ptr) -> left) && sw)
             rot_right(ptr);
@@ -140,8 +142,7 @@ static int object_rb_insert(struct object_rb_node **ptr, struct insert_context *
         }
     }
     else if (cmp_res > 0){
-        if ((res = object_rb_insert(&((*ptr) -> right), context, 1)) != OBJECT_SET_INSERT_SUCCES)
-            return res;
+        object_rb_insert(&((*ptr) -> right), context, 1);
 
         if ((*ptr) -> is_red && RED((*ptr) -> right) && !sw)
             rot_left(ptr);
@@ -155,9 +156,9 @@ static int object_rb_insert(struct object_rb_node **ptr, struct insert_context *
     else{
         if (context -> orig_object)
             *(context -> orig_object) = (*ptr) -> object;
-        return OBJECT_SET_INSERT_DUPLICATE;
+
+        context -> result_code = OBJECT_SET_INSERT_DUPLICATE;
     }
-    return OBJECT_SET_INSERT_SUCCES;
 }
 
 // iterator functions
@@ -183,14 +184,16 @@ void object_set_deinit(object_set *s, dealloc_func *F){
 }
 
 int object_set_insert(object_set *obj_set, void *obj, compare_func *comparator, void **orig_obj){
-    struct insert_context context = {comparator, obj, orig_obj};
-    int res = object_rb_insert(&(obj_set -> top), &context, 0);
+    struct insert_context context = {0, comparator, obj, orig_obj};
+    
+    object_rb_insert(&(obj_set -> top), &context, 0);
 
-    if (res == OBJECT_SET_INSERT_SUCCES){
+    if (context.result_code == OBJECT_SET_INSERT_SUCCES){
         (obj_set -> len)++;
         obj_set -> top -> is_red = 0;
     }
-    return res;
+
+    return context.result_code;
 }
 
 void object_set_iterator_init(object_set_iterator* iter, object_set* s){

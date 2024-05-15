@@ -31,7 +31,7 @@ set(reg_compiler_includes
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   # using Clang
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	set(reg_compiler_flags "-Wall -Werror -Wextra -pedantic -O3")
+	set(reg_compiler_flags "-Wall -Werror -Wextra -pedantic -g")
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   # using Intel C++
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")

@@ -33,6 +33,7 @@ static struct long_rb_node* new_long_rb_node(
     struct long_rb_node *res = 0;
 
     res = (struct long_rb_node*) malloc(sizeof(struct long_rb_node));
+
     if (res == NULL)
         return NULL;
 
@@ -43,7 +44,7 @@ static struct long_rb_node* new_long_rb_node(
     return res;
 }
 
-static void long_rb_free(struct long_rb_node *top){
+inline static void long_rb_free(struct long_rb_node *top){
     struct long_rb_stack s;
     struct long_rb_node *tmp;
 
@@ -114,13 +115,15 @@ inline static void rot_right(struct long_rb_node **ptr){
     *ptr = x;
 }
 
-static int long_rb_insert(struct long_rb_node **ptr, unsigned long x, char sw){
-    int res;
+static void long_rb_insert(struct long_rb_node **ptr, char sw, unsigned long x, int *res){
 
     if (*ptr == 0){
+        *res = LONG_SET_INSERT_SUCCES;
+
         if (!(*ptr = new_long_rb_node(x , 1, 0, 0)))
-            return LONG_SET_INSERT_ERROR;
-        return LONG_SET_INSERT_SUCCES;
+            *res = LONG_SET_INSERT_ERROR;
+
+        return;
     }
 
     if (RED((*ptr) -> left) && RED((*ptr) -> right)){
@@ -130,8 +133,7 @@ static int long_rb_insert(struct long_rb_node **ptr, unsigned long x, char sw){
     }
 
     if (x < (*ptr) -> num){
-        if ((res = long_rb_insert(&((*ptr) -> left), x, 0)) != LONG_SET_INSERT_SUCCES)
-            return res;
+        long_rb_insert(&((*ptr) -> left), 0, x, res);
 
         if ((*ptr) -> is_red && RED((*ptr) -> left) && sw)
             rot_right(ptr);
@@ -143,8 +145,7 @@ static int long_rb_insert(struct long_rb_node **ptr, unsigned long x, char sw){
         }
     }
     else if (x > (*ptr) -> num){
-        if ((res = long_rb_insert(&((*ptr) -> right), x, 1)) != LONG_SET_INSERT_SUCCES)
-            return res;
+        long_rb_insert(&((*ptr) -> right), 1, x, res);
 
         if ((*ptr) -> is_red && RED((*ptr) -> right) && !sw)
             rot_left(ptr);
@@ -156,14 +157,179 @@ static int long_rb_insert(struct long_rb_node **ptr, unsigned long x, char sw){
         }
     }
     else{
-        return LONG_SET_INSERT_DUPLICATE;
+        *res = LONG_SET_INSERT_DUPLICATE;
     }
-    return LONG_SET_INSERT_SUCCES;
+}
+
+#define is_2_node(rb_node_ptr) (!RED((rb_node_ptr)) && !RED((rb_node_ptr)->left) && !RED((rb_node_ptr)->right))
+
+// traverse tree down, making rotations and recoloring
+// to find the r34 (not root, 3 or 4 equivalent in 2-3-4 tree) node
+// with given value, if no such node, return closest to it
+
+static struct long_rb_node **rb_find_r34(struct long_rb_node **ptr, unsigned long x){
+    struct long_rb_node *next_node;
+    struct long_rb_node *sibling_node;
+
+
+    while (1){
+        // inductive rule
+        // on every iteration we enter node that is not 2 node
+
+        if ((*ptr) -> left && is_2_node((*ptr) -> left) && (*ptr) -> right && is_2_node((*ptr) -> right)){
+            (*ptr) -> is_red = 0;
+            (*ptr) -> left -> is_red = 1;
+            (*ptr) -> right -> is_red = 1;
+        }
+
+        if (x < (*ptr) -> num){
+            next_node = (*ptr) -> left;
+            sibling_node = (*ptr) -> right;
+
+            //no node with x in tree
+            if (next_node == 0)
+                return ptr;
+
+            // next node is not 2 node, so traverse to it
+            if (next_node -> is_red || RED(next_node -> left) || RED(next_node -> right))
+                goto TRAVERSE_LEFT;
+
+            // now we are looking at 2 node
+
+            // sibling should be black, rotate
+            if (sibling_node -> is_red){
+                rot_left(ptr);
+                (*ptr) -> is_red = 0;
+                (*ptr) -> left -> is_red = 1;
+                //ptr = &(*ptr) -> left;
+                //sibling_node = (*ptr) -> right;
+                goto TRAVERSE_LEFT;
+            }
+            // after this step parent is guaranteed to be red
+ 
+            // either sibling has one red son or no red sons
+            if (!RED(sibling_node -> right)){
+                // make left red son right
+                rot_right(&(*ptr) -> right);
+                sibling_node = (*ptr) -> right;
+                sibling_node -> is_red = 0;
+                sibling_node -> right -> is_red = 1;
+            }
+
+            // sibling has right red son case
+            rot_left(ptr);
+            (*ptr) -> is_red = (*ptr) -> left -> is_red;
+            (*ptr) -> left -> is_red = 0;
+            (*ptr) -> right -> is_red = 0;
+            next_node -> is_red = 1;
+
+TRAVERSE_LEFT:
+            ptr = &(*ptr) -> left;
+            continue;
+
+        }else if (x > (*ptr) -> num){
+            // symmetrical case
+            next_node = (*ptr) -> right;
+            sibling_node = (*ptr) -> left;
+
+            if (next_node == 0)
+                return ptr;
+
+            if (next_node -> is_red || RED(next_node -> left) || RED(next_node -> right))
+                goto TRAVERSE_RIGHT;
+
+            if (sibling_node -> is_red){
+                rot_right(ptr);
+                (*ptr) -> is_red = 0;
+                (*ptr) -> right -> is_red = 1;
+                //ptr = &(*ptr) -> right;
+                //sibling_node = (*ptr) -> left;
+                goto TRAVERSE_RIGHT;
+            }
+ 
+            if (!RED(sibling_node -> left)){
+                rot_left(&(*ptr) -> left);
+                sibling_node = (*ptr) -> left;
+                sibling_node -> is_red = 0;
+                sibling_node -> left -> is_red = 1;
+            }
+
+            rot_right(ptr);
+            (*ptr) -> is_red = (*ptr) -> right -> is_red;
+            (*ptr) -> right -> is_red = 0;
+            (*ptr) -> left -> is_red = 0;
+            next_node -> is_red = 1;
+
+TRAVERSE_RIGHT:
+            ptr = &(*ptr) -> right;
+            continue;
+        }
+
+        break;
+    } 
+    return ptr;
+}
+
+// deletes node in 2-3-4 leaf node or return next non 2 node
+// to start search for transplant node
+// return 0 if deletion was succes or return next non 2 node ptr
+
+static struct long_rb_node **long_rb_del_in_leaf(struct long_rb_node **ptr){
+    struct long_rb_node *tmp;
+
+    if ((*ptr) -> is_red){
+        if ((*ptr) -> left == 0){
+            free(*ptr);
+            *ptr = 0;
+            return 0;
+        }
+
+        if (!is_2_node((*ptr) -> left)){
+            return &(*ptr) -> left;
+        }else if (is_2_node((*ptr) -> right)){
+        // if we ended up in two 2 subnodes nodes 
+            (*ptr) -> is_red = 0;
+            (*ptr) -> left -> is_red = 1;
+            (*ptr) -> right -> is_red = 1;
+        }
+
+        return &(*ptr) -> right;
+    }
+    // we are in black node
+
+    // black root red left sibling
+    if ((*ptr) -> right == 0){
+        tmp = *ptr;
+        tmp -> left -> is_red = 0;
+        *ptr = tmp -> left;
+        free(tmp);
+        return 0; 
+    }else if ((*ptr) -> right -> is_red == 1){
+        return &(*ptr) -> right;
+    }
+
+    // black root red right sibling
+    if ((*ptr) -> left == 0){
+        tmp = *ptr;
+        tmp -> right -> is_red = 0;
+        *ptr = tmp -> right;
+        free(tmp);
+        return 0; 
+    }else if ((*ptr) -> left -> is_red == 1){
+        return &(*ptr) -> left;
+    }
+
+    if (is_2_node((*ptr) -> left))
+        return &(*ptr) -> right;
+
+    return &(*ptr) -> left;
 }
 
 // iterator functions
 
-inline static struct long_rb_node *set_left_dive(long_set_iterator *iter, struct long_rb_node *top){
+inline static struct long_rb_node *set_left_dive(
+        long_set_iterator *iter, 
+        struct long_rb_node *top){
 
     while (top -> left){
         long_rb_stack_push(&iter -> stack, top);
@@ -201,6 +367,7 @@ int long_set_copy_init(long_set *dst, long_set *src){
 
 void long_set_deinit(long_set *s){
     long_rb_free(s -> top);
+    s -> top = 0;
 }
 
 
@@ -213,12 +380,51 @@ void long_set_dealloc(long_set *ptr){
 
 
 int long_set_insert(long_set *ptr, unsigned long item){
-    int res = long_rb_insert(&(ptr -> top), item, 0);
+    int res;
+
+    long_rb_insert(&ptr -> top, 0, item, &res);
+
     if (res == LONG_SET_INSERT_SUCCES){
         (ptr -> len)++;
         ptr -> top -> is_red = 0;
     }
     return res;
+}
+
+int long_set_delete(long_set *ptr, unsigned long item){
+    struct long_rb_node **node_to_del_ptr;
+    struct long_rb_node *node_to_del;
+    struct long_rb_node **tmp;
+
+    if (ptr -> top == 0)
+        return LONG_SET_DELETE_NOITEM;
+
+    node_to_del_ptr = rb_find_r34(&ptr -> top, item);
+    node_to_del = *node_to_del_ptr;
+
+    if (node_to_del -> num != item)
+        return LONG_SET_DELETE_NOITEM;
+
+    // node is found
+
+    // works only if one node in set
+    if (ptr -> len == 1){
+        free(node_to_del); 
+        *node_to_del_ptr = 0;
+        goto DELETE_SUCCES;
+    }
+
+    // if tmp then search should continue
+    if (!(tmp = long_rb_del_in_leaf(node_to_del_ptr)))
+        goto DELETE_SUCCES;
+
+    tmp = rb_find_r34(tmp, item);
+    node_to_del -> num = (*tmp) -> num;
+    long_rb_del_in_leaf(tmp);
+
+DELETE_SUCCES:
+    ptr -> len--;
+    return LONG_SET_DELETE_SUCCES;
 }
 
 
