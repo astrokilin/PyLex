@@ -1,7 +1,34 @@
-#include "pattern_py_type.h"
-
 #include <stdio.h>
 #include <string.h>
+
+#include "pattern_py_type.h"
+
+static void
+handle_compiler_error(compiler_error *err)
+{
+    char err_msg[64];
+
+    switch (err -> err_type){
+        case ERROR_NO_MEMORY:
+            PyErr_NoMemory();
+            break;
+
+        case ERROR_UNEXPECTED_SYMBOL:
+            snprintf(err_msg, 64,
+                 "error in pattern %d near symbol %c\n", err->err_ind,
+                 *(err->err_offset));
+
+            PyErr_SetString(PyExc_ValueError, err_msg);
+            break;
+
+        case ERROR_STATES_OVERFLOW:
+            PyErr_SetString(PyExc_ValueError, "Resulting dfa is too big");
+            break;
+    } 
+}
+
+
+
 
 void
 Pattern_dealloc(PatternObject *self)
@@ -17,8 +44,7 @@ Pattern_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     self = (PatternObject *)type->tp_alloc(type, 0);
 
-    if (self != NULL) 
-    {
+    if (self != NULL) {
         memset(&self->table, 0, sizeof(dfa_table));
     }
 
@@ -33,7 +59,7 @@ Pattern_init(PyObject *self, PyObject *args, PyObject *kwds)
     PyObject **ascii_strings;
     char **patterns;
     int result;
-    dfa_table_syntax_error err_msg;
+    compiler_error err; 
 
     patterns_list = NULL;
     list_len = 0;
@@ -43,8 +69,7 @@ Pattern_init(PyObject *self, PyObject *args, PyObject *kwds)
 
     dfa_table_deinit(&(((PatternObject *)self)->table));
 
-    if (!PyArg_ParseTuple(args, "O!", &PyList_Type, &patterns_list)) 
-    {
+    if (!PyArg_ParseTuple(args, "O!", &PyList_Type, &patterns_list)) {
         return -1;
     }
 
@@ -52,53 +77,37 @@ Pattern_init(PyObject *self, PyObject *args, PyObject *kwds)
 
     patterns = (char **)PyMem_RawCalloc(list_len, sizeof(char *));
 
-    if (patterns == NULL) 
-    {
+    if (patterns == NULL) {
         PyErr_NoMemory();
         goto CLEANUP_EXIT;
     }
 
     ascii_strings = (PyObject **)PyMem_RawCalloc(list_len, sizeof(PyObject *));
 
-    if (ascii_strings == NULL) 
-    {
+    if (ascii_strings == NULL) {
         PyErr_NoMemory();
         goto CLEANUP_EXIT;
     }
 
-    for (Py_ssize_t i = 0; i < list_len; i++) 
-    {
+    for (Py_ssize_t i = 0; i < list_len; i++) {
         ascii_strings[i] = PyUnicode_AsASCIIString(
                  PyList_GetItem(patterns_list, i));
 
-        if (ascii_strings[i] == NULL)
-        {
+        if (ascii_strings[i] == NULL) {
             goto CLEANUP_EXIT;
         }
 
         patterns[i] = PyBytes_AsString(ascii_strings[i]);
     }
 
-    switch (dfa_table_init(
+    if (dfa_table_init(
                 &((PatternObject *)self)->table, 
                 patterns, 
                 list_len,
-                &err_msg))
+                &err) == DFA_BUILD_ERROR) 
     {
-        case DFA_BUILD_ERR_NOMEM:
-            PyErr_NoMemory();
-            goto CLEANUP_EXIT;
-            break;
-
-        case DFA_BUILD_ERR_SYNTAX:
-            PyErr_SetString(PyExc_ValueError, err_msg.err_str);
-            goto CLEANUP_EXIT;
-            break;
-
-        case DFA_BUILD_ERR_OVERFLOW:
-            PyErr_SetString(PyExc_ValueError, "Too many statements");
-            goto CLEANUP_EXIT;
-            break;
+        handle_compiler_error(&err);
+        goto CLEANUP_EXIT;
     }
 
     result = 0;
@@ -106,8 +115,7 @@ Pattern_init(PyObject *self, PyObject *args, PyObject *kwds)
 CLEANUP_EXIT:
     PyMem_RawFree(patterns);
 
-    for (Py_ssize_t i = 0; i < list_len; i++) 
-    {
+    for (Py_ssize_t i = 0; i < list_len; i++) {
         Py_XDECREF(ascii_strings[i]);
     }
 

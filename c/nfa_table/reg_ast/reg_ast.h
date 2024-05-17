@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <limits.h>
 
-#include "long_set.h"
+#include "dfa_table_parameters.h"
 
 #define AST_NODE_LEAF           0
 #define AST_NODE_LEAF_ACC       0 // internal
@@ -49,37 +49,16 @@ typedef struct {
     unsigned int sym;
 }ast_leaf_node;
 
-
-#define AST_ERR_MEM 0
-#define AST_ERR_SYN 1
-#define AST_ERR_OVF 2
-
-//TODO extend this structure to provide more info about regex syntax error
-
-struct error_data{
-    int err_type;
-    unsigned int err_ind;
-    char* err_offset;
-};
+#define AST_INIT_SUCCES     1
+#define AST_INIT_ERROR      0
 
 typedef struct{
-    unsigned int acc_states;
-    unsigned long states;
+    state_num_t acc_states;
+    target_num_t states;
     ast_node* top_node;
 }reg_ast;
 
-typedef struct{
-    unsigned int *state_targets;
-    unsigned long states_count;
-    long_set *followpos_sets;     
-    unsigned char *symbols;
-}nfa_table;
-
-reg_ast* ast_build(char **patterns, unsigned int patterns_l, struct error_data *err);
-void ast_dealloc(reg_ast*);
-
-int ast_init_nfa_table(reg_ast*, nfa_table*, long_set*);
-
-void nfa_table_deinit(nfa_table*);
+int reg_ast_init(reg_ast*, char**, unsigned int, compiler_error*);
+void reg_ast_deinit(reg_ast*);
 
 #endif

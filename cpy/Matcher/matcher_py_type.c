@@ -21,7 +21,7 @@ MatcherIterator_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     string = NULL;
     self = (MatcherIterator *)type->tp_alloc(type, 0);
 
-    if (self == NULL){
+    if (self == NULL) {
         return NULL;
     }
 
@@ -38,13 +38,11 @@ MatcherIterator_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     string = PyUnicode_AsEncodedString(string, "ascii", "strict");
 
-    if (string == NULL)
-    {
+    if (string == NULL) {
         goto CLEANUP_EXIT;
     }
 
-    if (PyObject_GetBuffer(string, &self->str_view, PyBUF_CONTIG_RO) == -1) 
-    {
+    if (PyObject_GetBuffer(string, &self->str_view, PyBUF_CONTIG_RO) == -1) {
         printf("no buffer\n");
         goto CLEANUP_EXIT;
     }
@@ -97,8 +95,7 @@ MatcherIterator_iternext(PyObject *self)
     p = &(self_iter->pattern_object->table);
     int re;
 
-    while (current_offset < MatcherIterator_len(self_iter))
-    {
+    while (current_offset < MatcherIterator_len(self_iter)) {
         switch (dfa_table_next_state(
                     p, 
                     self_iter->current_state,
@@ -134,8 +131,7 @@ MatcherIterator_iternext(PyObject *self)
     }
 
     // end of string and still no match
-    if (!match_occured)
-    {
+    if (!match_occured) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }

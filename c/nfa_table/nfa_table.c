@@ -1,4 +1,5 @@
-#include "ast.h"
+#include "nfa_table.h"
+#include "reg_ast.h"
 
 
 // for every state i in s_1 inserts s_2 into followpos(i)
@@ -206,8 +207,9 @@ static int calc_node(ast_node *n, struct calc_res *r, nfa_table *t){
     return 1;
 }
 
-int ast_init_nfa_table(reg_ast *ast, nfa_table *t, long_set *firstpos){
+int nfa_table_init(nfa_table *t, char **patterns, target_num_t patterns_l, compiler_error *err){
     struct calc_res res;
+    reg_ast ast;
 
     long_set_init(&res.firstpos);
     long_set_init(&res.lastpos);
@@ -216,28 +218,35 @@ int ast_init_nfa_table(reg_ast *ast, nfa_table *t, long_set *firstpos){
     t -> symbols = 0;
     t -> followpos_sets = 0;
 
-    if (!(t->followpos_sets = (long_set*) calloc(ast -> states, sizeof(long_set))))
+    if (!(reg_ast_init(&ast, patterns, patterns_l, err)))
         goto CALC_FAILED;
 
-    if (!(t->symbols = (unsigned char*) malloc(ast -> states)))
-        goto CALC_FAILED;
+    if (!(t -> followpos_sets = (long_set*) calloc(ast.states, sizeof(long_set))))
+        goto CALC_FAILED_NO_MEM;
 
-    if (!(t->state_targets = (unsigned int*) calloc(ast -> states, sizeof(unsigned int))))
-        goto CALC_FAILED;
+    if (!(t -> symbols = (unsigned char*) malloc(ast.states)))
+        goto CALC_FAILED_NO_MEM;
 
-    if (!(calc_node(ast -> top_node, &res, t)))
-        goto CALC_FAILED;
+    if (!(t -> state_targets = (state_num_t*) calloc(ast.states, sizeof(state_num_t))))
+        goto CALC_FAILED_NO_MEM;
 
-    *firstpos = res.firstpos;
+    if (!(calc_node(ast.top_node, &res, t)))
+        goto CALC_FAILED_NO_MEM;
+
+    t -> first_state = res.firstpos;
 
     long_set_deinit(&res.lastpos);
-    return 1;
+    reg_ast_deinit(&ast);
+    return NFA_INIT_SUCCES;
 
+CALC_FAILED_NO_MEM:
+    err -> err_type = ERROR_NO_MEMORY;
+    reg_ast_deinit(&ast);
 CALC_FAILED:
     free(t -> followpos_sets);
     free(t -> symbols);
     free(t -> state_targets);
-    return 0;
+    return NFA_INIT_ERROR;
 }
 
 void nfa_table_deinit(nfa_table *t){
@@ -247,4 +256,5 @@ void nfa_table_deinit(nfa_table *t){
     free(t -> state_targets);
     free(t -> followpos_sets);
     free(t -> symbols);
+    long_set_deinit(&t -> first_state);
 }

@@ -12,7 +12,8 @@ set(reg_compiler_flags " ")
 
 set(reg_compiler_src 
 		"c/dfa_table.c" 
-		"c/reg_ast/reg_ast.c" 
+		"c/nfa_table/nfa_table.c" 
+		"c/nfa_table/reg_ast/reg_ast.c"
 		"c/data_structs/set/object_set/object_set.c" 
 		"c/data_structs/set/long_set/long_set.c" 
 		"c/data_structs/queue/obj_queue.c" 
@@ -21,17 +22,20 @@ set(reg_compiler_src
 
 set(reg_compiler_includes
 		"c/" 
-		"c/reg_ast/" 
+		"c/nfa_table/"
+		"c/nfa_table/reg_ast/" 
 		"c/data_structs/set/long_set/" 
 		"c/data_structs/set/object_set/" 
 		"c/data_structs/list/" 
 		"c/data_structs/queue/"
 		)
 
+set (CMAKE_REGCOMPILER_GCC_OPTIONS "-Wall -Wextra -Werror -O3")
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  # using Clang
+	set(reg_compiler_flags ${CMAKE_REGCOMPILER_GCC_OPTIONS})
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	set(reg_compiler_flags "-Wall -Werror -Wextra -pedantic -g")
+	set(reg_compiler_flags ${CMAKE_REGCOMPILER_GCC_OPTIONS})
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   # using Intel C++
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")

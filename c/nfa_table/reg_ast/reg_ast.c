@@ -1,4 +1,4 @@
-#include "ast.h"
+#include "reg_ast.h"
 
 static ast_node* new_node(int type, int subtype, size_t node_type_size){
     ast_node *res;
@@ -31,20 +31,11 @@ static void ast_free(ast_node* node){
     free(node);
 }
 
-void ast_dealloc(reg_ast *ast){
-    if (!ast)
-        return;
-
-    ast_free(ast -> top_node);
-    free(ast);
-}
-
-
 struct parsing_context{
     char *cur_str;
-    unsigned int cur_accept_state;
-    size_t states;
-    struct error_data* err;
+    target_num_t cur_accept_state;
+    state_num_t states;
+    int err;
 };
 
 // TODO: redo this ugly parsing
@@ -69,7 +60,7 @@ static ast_node* parse_ere_content(struct parsing_context* context){
             goto ERR_EXIT;
 
         if (*(context -> cur_str) != ')'){
-            context -> err -> err_type = AST_ERR_SYN;
+            context -> err = ERROR_UNEXPECTED_SYMBOL;
             goto ERR_EXIT;
         }
 
@@ -77,25 +68,28 @@ static ast_node* parse_ere_content(struct parsing_context* context){
 
     }else if (cur_sym == ')' || cur_sym == '|'){
         if (!(top = new_node(AST_NODE_LEAF, AST_NODE_LEAF_EMP, sizeof(ast_leaf_node)))){
-            context -> err -> err_type = AST_ERR_MEM;
+            context -> err = ERROR_NO_MEMORY;
             goto ERR_EXIT;
         }
 
     }else if (cur_sym == '+' || cur_sym == '?' || cur_sym == '*' || cur_sym == 0){
-        context -> err -> err_type = AST_ERR_SYN;
+        context -> err = ERROR_UNEXPECTED_SYMBOL;
         goto ERR_EXIT;
 
     }else{
+        if (cur_sym == '\\')
+            context -> cur_str++;
+
         if (!(top = new_node(AST_NODE_LEAF, AST_NODE_LEAF_SYM, sizeof(ast_leaf_node)))){
-            context -> err -> err_type = AST_ERR_MEM;
+            context -> err = ERROR_NO_MEMORY;
             goto ERR_EXIT;
         }
         TO_LEAF_NODE(top) -> sym = cur_sym;
         context -> cur_str++;
     }
  
-    if (context -> states == ULONG_MAX){
-        context -> err -> err_type = AST_ERR_OVF;
+    if (context -> states == STATES_MAX_NUM){
+        context -> err = ERROR_STATES_OVERFLOW;
         goto ERR_EXIT;
     }
 
@@ -123,7 +117,7 @@ static ast_node* parse_ere_exp(struct parsing_context* context){
     if (next_sym == '*'){
 
         if (!(ere_dupl_sym = new_node(AST_NODE_UNOP, AST_NODE_UNOP_STAR, sizeof(ast_unop_node)))){
-            context -> err -> err_type = AST_ERR_MEM;
+            context -> err = ERROR_NO_MEMORY;
             goto ERR_EXIT;
         }
 
@@ -134,7 +128,7 @@ static ast_node* parse_ere_exp(struct parsing_context* context){
     }else if (next_sym == '?'){
 
         if (!(ere_dupl_sym = new_node(AST_NODE_UNOP, AST_NODE_UNOP_QUEST, sizeof(ast_unop_node)))){
-            context -> err -> err_type = AST_ERR_MEM;
+            context -> err = ERROR_NO_MEMORY;
             goto ERR_EXIT;
         }
 
@@ -145,7 +139,7 @@ static ast_node* parse_ere_exp(struct parsing_context* context){
     }else if (next_sym == '+'){
 
         if (!(ere_dupl_sym = new_node(AST_NODE_UNOP, AST_NODE_UNOP_PLUS, sizeof(ast_unop_node)))){
-            context -> err -> err_type = AST_ERR_MEM;
+            context -> err = ERROR_NO_MEMORY;
             goto ERR_EXIT;
         }
 
@@ -177,7 +171,7 @@ static ast_node* parse_ere_branch(struct parsing_context* context){
             goto ERR_EXIT;
 
         if (!(tmp = new_node(AST_NODE_BINOP, AST_NODE_BINOP_CAT, sizeof(ast_binop_node)))){
-            context -> err -> err_type = AST_ERR_MEM;
+            context -> err = ERROR_NO_MEMORY;
             goto ERR_EXIT;
         }
 
@@ -212,7 +206,7 @@ static ast_node* parse_reg_subexp(struct parsing_context* context){
             goto ERR_EXIT;
 
         if (!(tmp = new_node(AST_NODE_BINOP, AST_NODE_BINOP_OR, sizeof(ast_binop_node)))){
-            context -> err -> err_type = AST_ERR_MEM;
+            context -> err = ERROR_NO_MEMORY;
             goto ERR_EXIT;
         }
 
@@ -243,12 +237,12 @@ static ast_node* parse_reg_exp(struct parsing_context* context){
         goto ERR_EXIT;
 
     if (!(acc_node = new_node(AST_NODE_LEAF, AST_NODE_LEAF_ACC, sizeof(ast_leaf_node)))){
-        context -> err -> err_type = AST_ERR_MEM;
+        context -> err = ERROR_NO_MEMORY;
         goto ERR_EXIT;
     }
 
-    if (context -> states == ULONG_MAX){
-        context -> err -> err_type = AST_ERR_OVF;
+    if (context -> states == STATES_MAX_NUM){
+        context -> err = ERROR_STATES_OVERFLOW;
         goto ERR_EXIT;
     }
 
@@ -257,7 +251,7 @@ static ast_node* parse_reg_exp(struct parsing_context* context){
     TO_LEAF_NODE(acc_node) -> sym = context -> cur_accept_state;
 
     if (!(cat_node = new_node(AST_NODE_BINOP, AST_NODE_BINOP_CAT, sizeof(ast_binop_node)))){
-        context -> err -> err_type = AST_ERR_MEM;
+        context -> err = ERROR_NO_MEMORY;
         goto ERR_EXIT;
     }
 
@@ -273,21 +267,24 @@ ERR_EXIT:
 }
 
 
-reg_ast* ast_build(char **patterns, unsigned int patterns_l, struct error_data *err){
+int reg_ast_init(reg_ast *ast, char **patterns, target_num_t patterns_l, compiler_error *err){
     struct parsing_context context;
     ast_node *prev_ast_top;
     ast_node *cur_ast_top;
     ast_node *tmp;
-    reg_ast *res;
 
-    res = 0;
-    context.err = err;
+    context.err = 0;
     context.cur_accept_state = 0;
     context.states = 0;
     prev_ast_top = 0;
     cur_ast_top = 0;
 
     if (patterns_l > 0){
+
+        if (patterns_l == TARGETS_MAX_NUM){
+            context.err = ERROR_STATES_OVERFLOW;
+            goto ERR_EXIT;
+        }
 
         context.cur_str = patterns[0];
 
@@ -304,7 +301,7 @@ reg_ast* ast_build(char **patterns, unsigned int patterns_l, struct error_data *
                 goto ERR_EXIT;
 
             if (!(tmp = new_node(AST_NODE_BINOP, AST_NODE_BINOP_OR, sizeof(ast_binop_node)))){
-                err -> err_type = AST_ERR_MEM;
+                err -> err_type = ERROR_NO_MEMORY;
                 goto ERR_EXIT;
             }
 
@@ -315,23 +312,26 @@ reg_ast* ast_build(char **patterns, unsigned int patterns_l, struct error_data *
         }
     }
 
-    if ((res = (reg_ast*) malloc(sizeof(reg_ast))) == NULL){
-        err -> err_type = AST_ERR_MEM;
-        goto ERR_EXIT;
-    }
-
-    res -> acc_states = patterns_l;
-    res -> top_node = cur_ast_top;
-    res -> states = context.states;
-    return res;
+    ast -> acc_states = patterns_l;
+    ast -> top_node = cur_ast_top;
+    ast -> states = context.states;
+    return 1;
 
 ERR_EXIT:
     ast_free(prev_ast_top);
     ast_free(cur_ast_top);
-    free(res);
 
     err -> err_ind = context.cur_accept_state;
     err -> err_offset = context.cur_str;
+    err -> err_type = context.err;
     return 0;
 }
+
+void reg_ast_deinit(reg_ast *ast){
+    if (!ast)
+        return;
+
+    ast_free(ast -> top_node);
+}
+
 

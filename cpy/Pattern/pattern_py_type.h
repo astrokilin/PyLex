@@ -3,6 +3,7 @@
 
 #include <Python.h>
 
+#include "dfa_table_parameters.h"
 #include "dfa_table.h"
 
 typedef struct {
@@ -14,8 +15,10 @@ typedef struct {
 
 int
 Pattern_init(PyObject *self, PyObject *args, PyObject *kwds);
+
 PyObject *
 Pattern_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds);
+
 void
 Pattern_dealloc(PatternObject *self);
 

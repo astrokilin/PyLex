@@ -201,8 +201,6 @@ static struct long_rb_node **rb_find_r34(struct long_rb_node **ptr, unsigned lon
                 rot_left(ptr);
                 (*ptr) -> is_red = 0;
                 (*ptr) -> left -> is_red = 1;
-                //ptr = &(*ptr) -> left;
-                //sibling_node = (*ptr) -> right;
                 goto TRAVERSE_LEFT;
             }
             // after this step parent is guaranteed to be red
@@ -242,8 +240,6 @@ TRAVERSE_LEFT:
                 rot_right(ptr);
                 (*ptr) -> is_red = 0;
                 (*ptr) -> right -> is_red = 1;
-                //ptr = &(*ptr) -> right;
-                //sibling_node = (*ptr) -> left;
                 goto TRAVERSE_RIGHT;
             }
  
