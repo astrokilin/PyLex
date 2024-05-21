@@ -1,4 +1,4 @@
-# PythonCppExtension
+# PyLex Python extension
 
 ## Build
 
