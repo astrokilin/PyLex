@@ -30,7 +30,7 @@ set(reg_compiler_includes
 		"c/data_structs/queue/"
 		)
 
-set (CMAKE_REGCOMPILER_GCC_OPTIONS "-Wall -Wextra -Werror -O3")
+set (CMAKE_REGCOMPILER_GCC_OPTIONS "-Wall -Wextra -Werror -Wno-implicit-fallthrough -O3")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	set(reg_compiler_flags ${CMAKE_REGCOMPILER_GCC_OPTIONS})

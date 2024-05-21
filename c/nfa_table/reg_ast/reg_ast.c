@@ -53,39 +53,49 @@ static ast_node* parse_ere_content(struct parsing_context* context){
     top = 0;
     cur_sym = *(context -> cur_str);
 
-    if (cur_sym == '('){
-        context -> cur_str++;
-
-        if (!(top = parse_reg_subexp(context)))
-            goto ERR_EXIT;
-
-        if (*(context -> cur_str) != ')'){
-            context -> err = ERROR_UNEXPECTED_SYMBOL;
-            goto ERR_EXIT;
-        }
-
-        context -> cur_str++;
-
-    }else if (cur_sym == ')' || cur_sym == '|'){
-        if (!(top = new_node(AST_NODE_LEAF, AST_NODE_LEAF_EMP, sizeof(ast_leaf_node)))){
-            context -> err = ERROR_NO_MEMORY;
-            goto ERR_EXIT;
-        }
-
-    }else if (cur_sym == '+' || cur_sym == '?' || cur_sym == '*' || cur_sym == 0){
-        context -> err = ERROR_UNEXPECTED_SYMBOL;
-        goto ERR_EXIT;
-
-    }else{
-        if (cur_sym == '\\')
+    switch (cur_sym){
+        case '(':
             context -> cur_str++;
 
-        if (!(top = new_node(AST_NODE_LEAF, AST_NODE_LEAF_SYM, sizeof(ast_leaf_node)))){
-            context -> err = ERROR_NO_MEMORY;
+            if (!(top = parse_reg_subexp(context)))
+                goto ERR_EXIT;
+
+            if (*(context -> cur_str) != ')'){
+                context -> err = ERROR_UNEXPECTED_SYMBOL;
+                goto ERR_EXIT;
+            }
+
+            context -> cur_str++;
+            break;
+
+        case ')':
+        case '|':
+            if (!(top = new_node(AST_NODE_LEAF, AST_NODE_LEAF_EMP, sizeof(ast_leaf_node)))){
+                context -> err = ERROR_NO_MEMORY;
+                goto ERR_EXIT;
+            }
+
+            break;
+
+        case '+':
+        case '?':
+        case '*':
+        case 0:
+            context -> err = ERROR_UNEXPECTED_SYMBOL;
             goto ERR_EXIT;
-        }
-        TO_LEAF_NODE(top) -> sym = cur_sym;
-        context -> cur_str++;
+            break;
+
+        case '\\':
+            context -> cur_str++;
+
+        default:
+            if (!(top = new_node(AST_NODE_LEAF, AST_NODE_LEAF_SYM, sizeof(ast_leaf_node)))){
+                context -> err = ERROR_NO_MEMORY;
+                goto ERR_EXIT;
+            }
+            TO_LEAF_NODE(top) -> sym = cur_sym;
+            context -> cur_str++;
+            break;
     }
  
     if (context -> states == STATES_MAX_NUM){
@@ -114,38 +124,42 @@ static ast_node* parse_ere_exp(struct parsing_context* context){
 
     next_sym = *context -> cur_str;
 
-    if (next_sym == '*'){
+    switch (next_sym){
+        case '*':
 
-        if (!(ere_dupl_sym = new_node(AST_NODE_UNOP, AST_NODE_UNOP_STAR, sizeof(ast_unop_node)))){
-            context -> err = ERROR_NO_MEMORY;
-            goto ERR_EXIT;
-        }
+            if (!(ere_dupl_sym = new_node(AST_NODE_UNOP, AST_NODE_UNOP_STAR, sizeof(ast_unop_node)))){
+                context -> err = ERROR_NO_MEMORY;
+                goto ERR_EXIT;
+            }
 
-        context -> cur_str++;
-        TO_UNOP_NODE(ere_dupl_sym) -> arg = ere_content;
-        ere_content = ere_dupl_sym;
+            context -> cur_str++;
+            TO_UNOP_NODE(ere_dupl_sym) -> arg = ere_content;
+            ere_content = ere_dupl_sym;
+            break;
 
-    }else if (next_sym == '?'){
+        case '?':
 
-        if (!(ere_dupl_sym = new_node(AST_NODE_UNOP, AST_NODE_UNOP_QUEST, sizeof(ast_unop_node)))){
-            context -> err = ERROR_NO_MEMORY;
-            goto ERR_EXIT;
-        }
+            if (!(ere_dupl_sym = new_node(AST_NODE_UNOP, AST_NODE_UNOP_QUEST, sizeof(ast_unop_node)))){
+                context -> err = ERROR_NO_MEMORY;
+                goto ERR_EXIT;
+            }
 
-        context -> cur_str++;
-        TO_UNOP_NODE(ere_dupl_sym) -> arg = ere_content;
-        ere_content = ere_dupl_sym;
+            context -> cur_str++;
+            TO_UNOP_NODE(ere_dupl_sym) -> arg = ere_content;
+            ere_content = ere_dupl_sym;
+            break;
 
-    }else if (next_sym == '+'){
+        case '+':
 
-        if (!(ere_dupl_sym = new_node(AST_NODE_UNOP, AST_NODE_UNOP_PLUS, sizeof(ast_unop_node)))){
-            context -> err = ERROR_NO_MEMORY;
-            goto ERR_EXIT;
-        }
+            if (!(ere_dupl_sym = new_node(AST_NODE_UNOP, AST_NODE_UNOP_PLUS, sizeof(ast_unop_node)))){
+                context -> err = ERROR_NO_MEMORY;
+                goto ERR_EXIT;
+            }
 
-        context -> cur_str++;
-        TO_UNOP_NODE(ere_dupl_sym) -> arg = ere_content;
-        ere_content = ere_dupl_sym;
+            context -> cur_str++;
+            TO_UNOP_NODE(ere_dupl_sym) -> arg = ere_content;
+            ere_content = ere_dupl_sym;
+            break;
     }
 
     return ere_content; 

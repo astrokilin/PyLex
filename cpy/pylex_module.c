@@ -3,8 +3,10 @@
 #include "matcher_py_type.h"
 #include "pattern_py_type.h"
 
-static PyMethodDef pylex_methods[] = {finditer_METHODDEF,
-                                      {NULL, NULL, 0, NULL}};
+static PyMethodDef pylex_methods[] = {
+    finditer_METHODDEF,
+    {NULL, NULL, 0, NULL}
+};
 
 
 PyModuleDef pylex_module = {

@@ -7,8 +7,6 @@
 ||                                                            ||
 ***************************************************************/
 
-// TODO: redo all recursive functions with rb_stack
-
 // since the maximum depth ob rb - tree with size_t_max is 2*log2(size_t_max + 1)
 // we can always allocate stack for dfs
 

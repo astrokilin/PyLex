@@ -6,8 +6,6 @@
 ||                                                            ||
 ***************************************************************/
 
-// TODO: redo all recursive functions with rb_stack
-
 inline static void long_rb_stack_push(struct long_rb_stack *s, struct long_rb_node *n){
     s -> buf[s -> len++] = n;
 }
